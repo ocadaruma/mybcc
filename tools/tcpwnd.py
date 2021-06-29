@@ -79,10 +79,10 @@ int kretprobe__tcp_select_window(struct pt_regs *ctx) {
 
     struct sock *sk = *skpp;
     struct tcp_sock *tp = (struct tcp_sock *)sk;
-    u16 dport = 0; u32 rcv_wnd = 0; u8 rcv_wscale = 0;
+    u16 dport = 0; u32 rcv_wnd = 0; u16 rx_opt_bits = 0;
     bpf_probe_read(&dport, sizeof(dport), &sk->__sk_common.skc_dport);
     bpf_probe_read(&rcv_wnd, sizeof(rcv_wnd), &tp->rcv_wnd);
-    bpf_probe_read(&rcv_wscale, sizeof(rcv_wscale), &tp->rx_opt.rcv_wscale);
+    bpf_probe_read(&rx_opt_bits, sizeof(rx_opt_bits), &tp->rx_opt.opt_bits.data);
 
     u32 *wnd = curr_wnd.lookup(&dport);
     if (wnd == 0 || *wnd != rcv_wnd) {
@@ -90,9 +90,9 @@ int kretprobe__tcp_select_window(struct pt_regs *ctx) {
     }
 
     struct event_t event = {};
-    event.port = dport;
+    event.port = ntohs(dport);
     event.rcv_wnd = rcv_wnd;
-    event.rcv_wscale = rcv_wscale;
+    event.rcv_wscale = rx_opt_bits >> 12;
     events.perf_submit(ctx, &event, sizeof(event));
 
     curr_sock.delete(&pid_tgid);
