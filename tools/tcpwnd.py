@@ -52,7 +52,7 @@ BPF_PERF_OUTPUT(events);
 """
 
 bpf_text += """
-int kprobe__tcp_select_window(struct pt_regs *ctx, struct sock *sk) {
+int kprobe____tcp_select_window(struct pt_regs *ctx, struct sock *sk) {
     u64 pid_tgid = bpf_get_current_pid_tgid();
     u32 pid = pid_tgid >> 32;
     if (pid != TARGET_PID) {
@@ -70,7 +70,7 @@ int kprobe__tcp_select_window(struct pt_regs *ctx, struct sock *sk) {
     return 0;
 }
 
-int kretprobe__tcp_select_window(struct pt_regs *ctx) {
+int kretprobe____tcp_select_window(struct pt_regs *ctx) {
     u64 pid_tgid = bpf_get_current_pid_tgid();
     struct sock **skpp = curr_sock.lookup(&pid_tgid);
     if (skpp == 0) {
@@ -79,21 +79,22 @@ int kretprobe__tcp_select_window(struct pt_regs *ctx) {
 
     struct sock *sk = *skpp;
     struct tcp_sock *tp = (struct tcp_sock *)sk;
-    u16 dport = 0; u32 rcv_wnd = 0; u16 rx_opt_bits = 0;
+    u16 dport = 0;
+    u16 rx_opt_bits = 0;
     bpf_probe_read(&dport, sizeof(dport), &sk->__sk_common.skc_dport);
-    bpf_probe_read(&rcv_wnd, sizeof(rcv_wnd), &tp->rcv_wnd);
     bpf_probe_read(&rx_opt_bits, sizeof(rx_opt_bits), &tp->rx_opt.opt_bits.data);
 
-    u32 *wnd = curr_wnd.lookup(&dport);
-    if (wnd == 0 || *wnd != rcv_wnd) {
-        curr_wnd.update(&dport, &rcv_wnd);
-    }
+    u32 new_wnd = (u32)PT_REGS_RC(ctx);
 
-    struct event_t event = {};
-    event.port = ntohs(dport);
-    event.rcv_wnd = rcv_wnd;
-    event.rcv_wscale = rx_opt_bits >> 12;
-    events.perf_submit(ctx, &event, sizeof(event));
+    u32 *wnd = curr_wnd.lookup(&dport);
+    if (wnd == 0 || *wnd != new_wnd) {
+        curr_wnd.update(&dport, &new_wnd);
+        struct event_t event = {};
+        event.port = ntohs(dport);
+        event.rcv_wnd = new_wnd;
+        event.rcv_wscale = rx_opt_bits >> 12;
+        events.perf_submit(ctx, &event, sizeof(event));
+    }
 
     curr_sock.delete(&pid_tgid);
     return 0;
