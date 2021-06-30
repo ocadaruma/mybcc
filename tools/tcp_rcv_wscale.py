@@ -47,7 +47,7 @@ struct wnd_ctx_t {
 };
 
 BPF_PERF_OUTPUT(events);
-BPF_HASH(curr_wnd_ctx, u64, wnd_ctx_t);
+BPF_HASH(curr_wnd_ctx, u64, struct wnd_ctx_t);
 """
 
 bpf_text += """
