@@ -49,9 +49,11 @@ BPF_PERF_OUTPUT(events);
 """
 
 bpf_text += """
-int kprobe__tcp_v4_conn_request(
+int kprobe__tcp_v4_syn_recv_sock(
     struct pt_regs *ctx,
-    struct sock *sk, struct sk_buff *skb) {
+    struct sock *sk, struct sk_buff *skb,
+    struct request_sock *req,
+    struct dst_entry *dst) {
 
     u64 pid_tgid = bpf_get_current_pid_tgid();
     u32 pid = pid_tgid >> 32;
