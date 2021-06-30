@@ -1,9 +1,9 @@
 #!/usr/bin/python
 #
-# tcpwnd Trace TCP rcv window.
+# tcp_wnd Trace TCP SYN/ACK.
 #        For Linux, uses BCC, eBPF. Embedded C.
 #
-# USAGE: tcpwnd -p <PID> -h <HOST>
+# USAGE: tcp_synack -p <PID> -h <HOST>
 from __future__ import print_function
 from bcc import BPF
 from bcc.utils import printb
@@ -15,12 +15,12 @@ import socket
 
 # arguments
 examples = """examples:
-    ./tcpwnd.py -p 55301 -h foo-bar.com
+    ./tcp_synack.py -p 55301 -h foo-bar.com
 """
 
 
 parser = argparse.ArgumentParser(
-    description="Trace TCP rcv window",
+    description="Trace TCP SYN/ACK",
     add_help=False)
 parser.add_argument(
     "-h", "--host",
@@ -42,61 +42,39 @@ bpf_text = tcp_headers
 bpf_text += """
 struct event_t {
     u16 port;
-    u32 rcv_wnd;
     u8 rcv_wscale;
 };
 
-BPF_HASH(curr_sock, u64, struct sock *);
-BPF_HASH(curr_wnd, u16, u32);
 BPF_PERF_OUTPUT(events);
 """
 
 bpf_text += """
-int kprobe____tcp_select_window(struct pt_regs *ctx, struct sock *sk) {
+int kprobe__tcp_make_synack(
+    struct pt_regs *ctx,
+    struct sock *sk,
+    struct dst_entry *dst,
+    struct request_sock *req,
+    struct tcp_fastopen_cookie *foc) {
+
     u64 pid_tgid = bpf_get_current_pid_tgid();
     u32 pid = pid_tgid >> 32;
     if (pid != TARGET_PID) {
         return 0;
     }
 
-    u16 dport = 0; u32 daddr = 0;
-    bpf_probe_read(&dport, sizeof(dport), &sk->__sk_common.skc_dport);
+    u32 daddr = 0; u16 dport = 0;
     bpf_probe_read(&daddr, sizeof(daddr), &sk->__sk_common.skc_daddr);
+    bpf_probe_read(&dport, sizeof(dport), &sk->__sk_common.skc_dport);
 
     if (daddr != TARGET_HOST) {
         return 0;
     }
-    curr_sock.update(&pid_tgid, &sk);
-    return 0;
-}
 
-int kretprobe____tcp_select_window(struct pt_regs *ctx) {
-    u64 pid_tgid = bpf_get_current_pid_tgid();
-    struct sock **skpp = curr_sock.lookup(&pid_tgid);
-    if (skpp == 0) {
-        return 0;
-    }
+    struct event_t event = {};
+    event.port = ntohs(dport);
+    event.rcv_wscale = 42;
+    events.perf_submit(ctx, &event, sizeof(event));
 
-    struct sock *sk = *skpp;
-    struct tcp_sock *tp = (struct tcp_sock *)sk;
-    u16 dport = 0;
-    u16 rx_opt_bits = 0;
-    bpf_probe_read(&dport, sizeof(dport), &sk->__sk_common.skc_dport);
-    bpf_probe_read(&rx_opt_bits, sizeof(rx_opt_bits), &tp->rx_opt.opt_bits.data);
-
-    u32 new_wnd = (u32)PT_REGS_RC(ctx);
-
-    u32 *wnd = curr_wnd.lookup(&dport);
-    if (wnd == 0 || *wnd != new_wnd) {
-        curr_wnd.update(&dport, &new_wnd);
-        struct event_t event = {};
-        event.port = ntohs(dport);
-        event.rcv_wnd = new_wnd;
-        event.rcv_wscale = rx_opt_bits >> 12;
-        events.perf_submit(ctx, &event, sizeof(event));
-    }
-
-    curr_sock.delete(&pid_tgid);
     return 0;
 }
 """
@@ -114,16 +92,15 @@ bpf_text = bpf_text.replace('TARGET_HOST', str(
 def print_event(cpu, data, size):
     event = b["events"].event(data)
     printb(b"%-9s " % datetime.now().strftime("%H:%M:%S").encode('ascii'), nl="")
-    printb(b"%-7s %-10s %-10s" % (
+    printb(b"%-7s %-10s" % (
         event.port,
-        event.rcv_wnd,
         event.rcv_wscale
     ))
 
 
 # header
-print("%-9s %-7s %-10s %-10s" % (
-    "TIME", "DPORT", "RCV_WND", "RCV_WSCALE"
+print("%-9s %-7s %-10s" % (
+    "TIME", "DPORT", "RCV_WSCALE"
 ))
 
 

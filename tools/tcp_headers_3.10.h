@@ -169,14 +169,16 @@ struct tcp_options_received {
     u32	rcv_tsval;	/* Time stamp value             	*/
     u32	rcv_tsecr;	/* Time stamp echo reply        	*/
     union {
-       u16 data;
-       u16 saw_tstamp : 1;	/* Saw TIMESTAMP on last packet		*/
-       u16 tstamp_ok : 1;	/* TIMESTAMP seen on SYN packet		*/
-       u16 dsack : 1;	/* D-SACK is scheduled			*/
-       u16 wscale_ok : 1;	/* Wscale seen on SYN packet		*/
-       u16 sack_ok : 4;	/* SACK seen on SYN packet		*/
-       u16 snd_wscale : 4;	/* Window scaling received from sender	*/
-       u16 rcv_wscale : 4;	/* Window scaling to send to receiver	*/
+      u16 data;
+      struct {
+        u16 saw_tstamp : 1;	/* Saw TIMESTAMP on last packet		*/
+        u16 tstamp_ok : 1;	/* TIMESTAMP seen on SYN packet		*/
+        u16 dsack : 1;	/* D-SACK is scheduled			*/
+        u16 wscale_ok : 1;	/* Wscale seen on SYN packet		*/
+        u16 sack_ok : 4;	/* SACK seen on SYN packet		*/
+        u16 snd_wscale : 4;	/* Window scaling received from sender	*/
+        u16 rcv_wscale : 4;	/* Window scaling to send to receiver	*/
+      } fields;
     } opt_bits;
     u8	num_sacks;	/* Number of SACK blocks		*/
     u16	user_mss;	/* mss requested by user in ioctl	*/
