@@ -37,6 +37,7 @@ bpf_text = tcp_headers
 bpf_text += """
 struct event_t {
     u16 port;
+    u32 window_clamp;
     u8 rcv_wscale;
 };
 
@@ -86,6 +87,7 @@ int kretprobe__tcp_openreq_init_rwin(struct pt_regs *ctx) {
     u8 bits = 0;
     bpf_probe_read(&bits, sizeof(bits), &ireq->scale_bits);
     struct event_t event = {};
+    bpf_probe_read(&event.window_clamp, sizeof(u32), &req->window_clamp);
     event.port = ntohs(wnd_ctx->dport);
     event.rcv_wscale = bits >> 4;
     events.perf_submit(ctx, &event, sizeof(event));
@@ -105,15 +107,16 @@ bpf_text = bpf_text.replace('TARGET_HOST', str(
 def print_event(cpu, data, size):
     event = b["events"].event(data)
     printb(b"%-9s " % datetime.now().strftime("%H:%M:%S").encode('ascii'), nl="")
-    printb(b"%-7s %-10s" % (
+    printb(b"%-7s %-10s %-10s" % (
         event.port,
-        event.rcv_wscale
+        event.rcv_wscale,
+        event.window_clamp
     ))
 
 
 # header
-print("%-9s %-7s %-10s" % (
-    "TIME", "DPORT", "RCV_WSCALE"
+print("%-9s %-7s %-10s %-10s" % (
+    "TIME", "DPORT", "RCV_WSCALE", "WND_CLAMP"
 ))
 
 
