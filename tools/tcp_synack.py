@@ -74,10 +74,10 @@ int kprobe__tcp_make_synack(
         return 0;
     }
 
-    struct event_t event = {};
-    event.port = ntohs(dport);
-    event.rcv_wscale = 42;
-    events.perf_submit(ctx, &event, sizeof(event));
+    // struct event_t event = {};
+    // event.port = ntohs(dport);
+    // event.rcv_wscale = 42;
+    // events.perf_submit(ctx, &event, sizeof(event));
 
     return 0;
 }
