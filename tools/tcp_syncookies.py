@@ -42,6 +42,7 @@ struct event_t {
 };
 
 struct cookie_ctx_t {
+    u32 *window_clamp_p;
     u32 window_clamp;
 };
 
@@ -70,7 +71,17 @@ int kprobe__tcp_select_initial_window(struct pt_regs *ctx,
 
     struct cookie_ctx_t *cookie_ctx = curr_cookie_ctx.lookup(&pid_tgid);
     if (cookie_ctx != 0) {
-        bpf_probe_read(&cookie_ctx->window_clamp, sizeof(u32), window_clamp);
+        cookie_ctx->window_clamp_p = window_clamp;
+    }
+    return 0;
+}
+
+int kretprobe__tcp_select_initial_window(struct pt_regs *ctx) {
+    u64 pid_tgid = bpf_get_current_pid_tgid();
+
+    struct cookie_ctx_t *cookie_ctx = curr_cookie_ctx.lookup(&pid_tgid);
+    if (cookie_ctx != 0) {
+        bpf_probe_read(&cookie_ctx->window_clamp, sizeof(u32), ctx->window_clamp_p);
     }
     return 0;
 }
