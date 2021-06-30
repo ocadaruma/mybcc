@@ -1,0 +1,5 @@
+= Personal notes
+
+== TIPS
+* To check if a function can be attached by kprobe
+** `$ sudo grep $func_name /proc/kallsyms`
