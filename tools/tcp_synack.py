@@ -59,9 +59,10 @@ int kprobe__tcp_make_synack(
         return 0;
     }
 
+    struct inet_request_sock *ireq = (struct inet_request_sock *)req;
     struct event_t event = {};
     event.port = ntohs(dport);
-    event.rcv_wscale = 42;
+    bpf_probe_read(&event.rcv_wscale, sizeof(u8), &ireq->rcv_wscale);
     events.perf_submit(ctx, &event, sizeof(event));
 
     return 0;
