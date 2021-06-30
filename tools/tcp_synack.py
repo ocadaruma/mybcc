@@ -63,8 +63,8 @@ int kprobe__tcp_make_synack(
     }
 
     u32 daddr = 0; u16 dport = 0;
-    bpf_probe_read(&daddr, sizeof(daddr), &sk->__sk_common.skc_daddr);
-    bpf_probe_read(&dport, sizeof(dport), &sk->__sk_common.skc_dport);
+    bpf_probe_read(&daddr, sizeof(daddr), &req->__req_common.skc_daddr);
+    bpf_probe_read(&dport, sizeof(dport), &req->__req_common.skc_dport);
 
     if (daddr != TARGET_HOST) {
         return 0;
