@@ -61,11 +61,11 @@ int kprobe__cookie_v4_check(struct pt_regs *ctx,
     return 0;
 }
 
+// drop last argument for BPF limitation
 int kprobe__tcp_select_initial_window(struct pt_regs *ctx,
     int __space, __u32 mss,
     __u32 *rcv_wnd, __u32 *window_clamp,
-    int wscale_ok, __u8 *rcv_wscale,
-    __u32 init_rcv_wnd) {
+    int wscale_ok, __u8 *rcv_wscale) {
     u64 pid_tgid = bpf_get_current_pid_tgid();
 
     struct cookie_ctx_t *cookie_ctx = curr_cookie_ctx.lookup(&pid_tgid);
