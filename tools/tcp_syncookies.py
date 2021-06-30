@@ -44,30 +44,6 @@ BPF_PERF_OUTPUT(events);
 """
 
 bpf_text += """
-int kprobe__tcp_openreq_init_rwin(
-    struct pt_regs *ctx,
-    struct request_sock *req,
-    struct sock *sk,
-    struct dst_entry *dst) {
-
-    u32 daddr = 0; u16 dport = 0;
-    bpf_probe_read(&daddr, sizeof(daddr), &req->__req_common.skc_daddr);
-    bpf_probe_read(&dport, sizeof(dport), &req->__req_common.skc_dport);
-
-    if (daddr != TARGET_HOST) {
-        return 0;
-    }
-
-    struct wnd_ctx_t wnd_ctx = {};
-    wnd_ctx.req = req;
-    wnd_ctx.sk = sk;
-    wnd_ctx.dport = dport;
-    u64 pid_tgid = bpf_get_current_pid_tgid();
-    curr_wnd_ctx.update(&pid_tgid, &wnd_ctx);
-
-    return 0;
-}
-
 int kretprobe__cookie_v4_check(struct pt_regs *ctx) {
     struct sock *sk = (struct sock *)PT_REGS_RC(ctx);
     
