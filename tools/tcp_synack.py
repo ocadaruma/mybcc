@@ -60,7 +60,7 @@ int kprobe__tcp_make_synack(
     }
 
     struct my_inet_request_sock *ireq = (struct my_inet_request_sock *)req;
-    u8 bits = *((u8 *)ireq->flags_begin);
+    u8 bits = ireq->scale_bits;
     struct event_t event = {};
     event.port = ntohs(dport);
     event.rcv_wscale = bits & 0xf;

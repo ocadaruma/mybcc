@@ -81,7 +81,7 @@ int kretprobe____tcp_select_window(struct pt_regs *ctx) {
     u16 dport = 0;
     u16 rx_opt_bits = 0;
     bpf_probe_read(&dport, sizeof(dport), &sk->__sk_common.skc_dport);
-    bpf_probe_read(&rx_opt_bits, sizeof(rx_opt_bits), &tp->rx_opt.opt_bits.data);
+    bpf_probe_read(&rx_opt_bits, sizeof(rx_opt_bits), &tp->rx_opt.opt_bits);
 
     u32 new_wnd = (u32)PT_REGS_RC(ctx);
 
