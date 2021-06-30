@@ -63,7 +63,7 @@ int kprobe__tcp_make_synack(
     u8 bits = ireq->scale_bits;
     struct event_t event = {};
     event.port = ntohs(dport);
-    event.rcv_wscale = bits & 0xf;
+    event.rcv_wscale = bits >> 4;
     events.perf_submit(ctx, &event, sizeof(event));
 
     return 0;
