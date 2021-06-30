@@ -49,12 +49,9 @@ BPF_PERF_OUTPUT(events);
 """
 
 bpf_text += """
-int kprobe__tcp_make_synack(
+int kprobe__tcp_v4_hnd_req(
     struct pt_regs *ctx,
-    struct sock *sk,
-    struct dst_entry *dst,
-    struct request_sock *req,
-    struct tcp_fastopen_cookie *foc) {
+    struct sock *sk, struct sk_buff *skb) {
 
     u64 pid_tgid = bpf_get_current_pid_tgid();
     u32 pid = pid_tgid >> 32;
@@ -67,8 +64,8 @@ int kprobe__tcp_make_synack(
     event.port = ntohs(dport);
     event.rcv_wscale = 42;
     events.perf_submit(ctx, &event, sizeof(event));
-    bpf_probe_read(&daddr, sizeof(daddr), &req->__req_common.skc_daddr);
-    bpf_probe_read(&dport, sizeof(dport), &req->__req_common.skc_dport);
+    // bpf_probe_read(&daddr, sizeof(daddr), &req->__req_common.skc_daddr);
+    // bpf_probe_read(&dport, sizeof(dport), &req->__req_common.skc_dport);
 
     if (daddr != TARGET_HOST) {
         return 0;
