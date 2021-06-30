@@ -81,7 +81,7 @@ int kretprobe__tcp_select_initial_window(struct pt_regs *ctx) {
 
     struct cookie_ctx_t *cookie_ctx = curr_cookie_ctx.lookup(&pid_tgid);
     if (cookie_ctx != 0) {
-        bpf_probe_read(&cookie_ctx->window_clamp, sizeof(u32), ctx->window_clamp_p);
+        bpf_probe_read(&cookie_ctx->window_clamp, sizeof(u32), cookie_ctx->window_clamp_p);
     }
     return 0;
 }
