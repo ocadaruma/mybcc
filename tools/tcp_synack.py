@@ -3,7 +3,7 @@
 # tcp_wnd Trace TCP SYN/ACK.
 #        For Linux, uses BCC, eBPF. Embedded C.
 #
-# USAGE: tcp_synack -p <PID> -h <HOST>
+# USAGE: tcp_synack -h <HOST>
 from __future__ import print_function
 from bcc import BPF
 from bcc.utils import printb
@@ -15,7 +15,7 @@ import socket
 
 # arguments
 examples = """examples:
-    ./tcp_synack.py -p 55301 -h foo-bar.com
+    ./tcp_synack.py -h foo-bar.com
 """
 
 
@@ -25,11 +25,6 @@ parser = argparse.ArgumentParser(
 parser.add_argument(
     "-h", "--host",
     help="trace specific host. should be IP or hostname",
-    required=True)
-parser.add_argument(
-    "-p", "--pid",
-    help="target PID",
-    type=int,
     required=True)
 args = parser.parse_args()
 
@@ -49,40 +44,31 @@ BPF_PERF_OUTPUT(events);
 """
 
 bpf_text += """
-int kprobe__tcp_v4_conn_request(
+int kprobe__tcp_make_synack(
     struct pt_regs *ctx,
-    struct sock *sk, struct sk_buff *skb) {
-
-    u64 pid_tgid = bpf_get_current_pid_tgid();
-    u32 pid = pid_tgid >> 32;
-    if (pid != TARGET_PID) {
-        return 0;
-    }
+    struct sock *sk,
+    struct dst_entry *dst,
+    struct request_sock *req,
+    struct tcp_fastopen_cookie *foc) {
 
     u32 daddr = 0; u16 dport = 0;
-    struct event_t event = {};
-    event.port = ntohs(dport);
-    event.rcv_wscale = 42;
-    events.perf_submit(ctx, &event, sizeof(event));
-    // bpf_probe_read(&daddr, sizeof(daddr), &req->__req_common.skc_daddr);
-    // bpf_probe_read(&dport, sizeof(dport), &req->__req_common.skc_dport);
+    bpf_probe_read(&daddr, sizeof(daddr), &req->__req_common.skc_daddr);
+    bpf_probe_read(&dport, sizeof(dport), &req->__req_common.skc_dport);
 
     if (daddr != TARGET_HOST) {
         return 0;
     }
 
-    // struct event_t event = {};
-    // event.port = ntohs(dport);
-    // event.rcv_wscale = 42;
-    // events.perf_submit(ctx, &event, sizeof(event));
+    struct event_t event = {};
+    event.port = ntohs(dport);
+    event.rcv_wscale = 42;
+    events.perf_submit(ctx, &event, sizeof(event));
 
     return 0;
 }
 """
 
 # code substitutions
-bpf_text = bpf_text.replace('TARGET_PID', str(args.pid))
-
 ip = socket.gethostbyname(args.host)
 segs = [int(s) for s in ip.split('.')]
 bpf_text = bpf_text.replace('TARGET_HOST', str(
