@@ -49,7 +49,7 @@ BPF_PERF_OUTPUT(events);
 """
 
 bpf_text += """
-int kprobe__tcp_v4_hnd_req(
+int kprobe__tcp_v4_conn_request(
     struct pt_regs *ctx,
     struct sock *sk, struct sk_buff *skb) {
 
