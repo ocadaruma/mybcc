@@ -1,5 +1,8 @@
 = Personal notes
 
+== C
+* `x ? : y` is equivalent to `x ? x : y`
+
 == TIPS
 * To check if a function can be attached by kprobe
 ** `$ sudo grep $func_name /proc/kallsyms`
