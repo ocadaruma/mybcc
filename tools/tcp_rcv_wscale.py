@@ -86,7 +86,7 @@ int kretprobe__tcp_openreq_init_rwin(struct pt_regs *ctx) {
     u8 bits = 0;
     bpf_probe_read(&bits, sizeof(bits), &ireq->scale_bits);
     struct event_t event = {};
-    event.port = ntohs(dport);
+    event.port = ntohs(wnd_ctx->dport);
     event.rcv_wscale = bits >> 4;
     events.perf_submit(ctx, &event, sizeof(event));
 
