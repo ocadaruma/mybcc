@@ -447,3 +447,30 @@ struct tcp_timewait_sock {
     struct tcp_md5sig_key	  *tw_md5_key;
 #endif
 };
+
+struct my_inet_request_sock {
+	struct request_sock	req;
+#define ir_loc_addr		req.__req_common.skc_rcv_saddr
+#define ir_rmt_addr		req.__req_common.skc_daddr
+#define ir_num			req.__req_common.skc_num
+#define ir_rmt_port		req.__req_common.skc_dport
+#define ir_v6_rmt_addr		req.__req_common.skc_v6_daddr
+#define ir_v6_loc_addr		req.__req_common.skc_v6_rcv_saddr
+#define ir_iif			req.__req_common.skc_bound_dev_if
+#define ireq_family		req.__req_common.skc_family
+
+	int flags_begin[0];
+	u16			snd_wscale : 4,
+				rcv_wscale : 4,
+				tstamp_ok  : 1,
+				sack_ok	   : 1,
+				wscale_ok  : 1,
+				ecn_ok	   : 1,
+				acked	   : 1,
+				no_srccheck: 1;
+	int flags_end[0];
+	union {
+		struct ip_options_rcu	*opt;
+		struct sk_buff		*pktopts;
+	};
+};

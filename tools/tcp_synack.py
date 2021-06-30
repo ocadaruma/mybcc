@@ -59,7 +59,7 @@ int kprobe__tcp_make_synack(
         return 0;
     }
 
-    struct inet_request_sock *ireq = (struct inet_request_sock *)req;
+    struct my_inet_request_sock *ireq = (struct my_inet_request_sock *)req;
     u8 bits = *((u8 *)ireq->flags_begin);
     struct event_t event = {};
     event.port = ntohs(dport);
