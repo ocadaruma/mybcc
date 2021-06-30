@@ -63,6 +63,10 @@ int kprobe__tcp_make_synack(
     }
 
     u32 daddr = 0; u16 dport = 0;
+    struct event_t event = {};
+    event.port = ntohs(dport);
+    event.rcv_wscale = 42;
+    events.perf_submit(ctx, &event, sizeof(event));
     bpf_probe_read(&daddr, sizeof(daddr), &req->__req_common.skc_daddr);
     bpf_probe_read(&dport, sizeof(dport), &req->__req_common.skc_dport);
 
