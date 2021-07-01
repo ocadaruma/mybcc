@@ -87,12 +87,10 @@ def print_event(cpu, data, size):
 
     kernel_stack = [] if event.kernel_stack_id < 0 else stack_traces.walk(event.kernel_stack_id)
     user_stack = [] if event.user_stack_id < 0 else stack_traces.walk(event.user_stack_id)
-    if len(kernel_stack) > 0:
-        print("kernel stack:")
-        print_stack_traces(kernel_stack)
-    if len(user_stack) > 0:
-        print("user stack:")
-        print_stack_traces(user_stack)
+    print("kernel stack:")
+    print_stack_traces(kernel_stack)
+    print("user stack:")
+    print_stack_traces(user_stack)
 
     print("================")
 
