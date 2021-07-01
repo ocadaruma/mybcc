@@ -47,11 +47,13 @@ struct event_t {
     u32 selected_window;
     u8 quick;
     u8 pingpong;
+    u32 ack_timeout;
 };
 
 struct check_ctx_t {
     int ofo_possible;
     u32 selected_window;
+    struct sock* sk;
 };
 
 BPF_HASH(curr_check_ctx, u64, struct check_ctx_t);
@@ -70,6 +72,7 @@ int kprobe____tcp_ack_snd_check(struct pt_regs *ctx,
 
     struct check_ctx_t check_ctx = {};
     check_ctx.ofo_possible = ofo_possible;
+    check_ctx.sk = sk;
     u64 pid_tgid = bpf_get_current_pid_tgid();
     curr_check_ctx.update(&pid_tgid, &check_ctx);
 
@@ -85,12 +88,14 @@ int kretprobe____tcp_select_window(struct pt_regs *ctx) {
     return 0;
 }
 
-static void record(struct pt_regs *ctx, struct sock *sk, u8 delayed) {
+static void record(struct pt_regs *ctx, u8 delayed) {
     u64 pid_tgid = bpf_get_current_pid_tgid();
     struct check_ctx_t *check_ctx = curr_check_ctx.lookup(&pid_tgid);
     if (check_ctx == 0) {
         return;
     }
+    struct sock *sk = check_ctx->sk;
+
     struct event_t event = {};
     u16 dport = 0;
     bpf_probe_read(&dport, sizeof(dport), &sk->__sk_common.skc_dport);
@@ -109,18 +114,19 @@ static void record(struct pt_regs *ctx, struct sock *sk, u8 delayed) {
 
     bpf_probe_read(&event.quick, sizeof(u8), &icsk->icsk_ack.quick);
     bpf_probe_read(&event.pingpong, sizeof(u8), &icsk->icsk_ack.pingpong);
+    bpf_probe_read(&event.ack_timeout, sizeof(u32), &icsk->icsk_ack.timeout);
     events.perf_submit(ctx, &event, sizeof(event));
 
     curr_check_ctx.delete(&pid_tgid);
 }
 
-int kprobe__tcp_send_ack(struct pt_regs *ctx, struct sock *sk) {
-    record(ctx, sk, 0);
+int kretprobe__tcp_send_ack(struct pt_regs *ctx) {
+    record(ctx, 0);
     return 0;
 }
 
-int kprobe__tcp_send_delayed_ack(struct pt_regs *ctx, struct sock *sk) {
-    record(ctx, sk, 1);
+int kretprobe__tcp_send_delayed_ack(struct pt_regs *ctx) {
+    record(ctx, 1);
     return 0;
 }
 """
@@ -142,7 +148,7 @@ def print_stack_traces(frames):
 def print_event(cpu, data, size):
     event = b["events"].event(data)
     printb(b"%-9s " % datetime.now().strftime("%H:%M:%S").encode('ascii'), nl="")
-    printb(b"%-7d %-7d %-10d %-10d %-10d %-10d %-10s %-10d %-10d" % (
+    printb(b"%-7d %-7d %-10d %-10d %-10d %-10d %-10s %-10d %-10d %-10d" % (
         event.port,
         event.delayed,
         event.rcv_nxt - event.rcv_wup,
@@ -151,7 +157,8 @@ def print_event(cpu, data, size):
         event.rcv_wnd,
         (((event.rcv_nxt - event.rcv_wup) > event.rcv_mss) and (event.selected_window >= event.rcv_wnd)),
         event.quick,
-        event.pingpong
+        event.pingpong,
+        event.ack_timeout
     ))
 
     # kernel_stack = [] if event.kernel_stack_id < 0 else stack_traces.walk(event.kernel_stack_id)
@@ -165,8 +172,8 @@ def print_event(cpu, data, size):
 
 
 # header
-print("%-9s %-7s %-7s %-10s %-10s %-10s %-10s %-10s %-10s %-10s" % (
-    "TIME", "DPORT", "DEL", "NXT-WUP", "MSS", "SEL_WND", "RCV_WND", "FULL", "QUICK", "PPONG"
+print("%-9s %-7s %-7s %-10s %-10s %-10s %-10s %-10s %-10s %-10s %-10s" % (
+    "TIME", "DPORT", "DEL", "NXT-WUP", "MSS", "SEL_WND", "RCV_WND", "FULL", "QUICK", "PPONG", "ATO"
 ))
 
 
