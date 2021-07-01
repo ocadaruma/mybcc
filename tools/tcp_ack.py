@@ -38,6 +38,7 @@ bpf_text += """
 struct event_t {
     u16 port;
     int kernel_stack_id;
+    int user_stack_id;
 };
 
 BPF_STACK_TRACE(stack_traces, 1000);
@@ -56,6 +57,7 @@ int kprobe____tcp_ack_snd_check(struct pt_regs *ctx, struct sock *sk, int ofo_po
     struct event_t event = {};
     event.port = ntohs(dport);
     event.kernel_stack_id = stack_traces.get_stackid(ctx, 0);
+    event.user_stack_id = stack_traces.get_stackid(ctx, BPF_F_USER_STACK);
     events.perf_submit(ctx, &event, sizeof(event));
 
     return 0;
@@ -70,6 +72,12 @@ bpf_text = bpf_text.replace('TARGET_HOST', str(
 ))
 
 
+def print_stack_traces(frames):
+    for (i, addr) in enumerate(frames):
+        symbol = b.ksym(addr, show_offset=True).decode('utf-8', 'replace')
+        print("  {}: [0x{:x}] {}".format(i, addr, symbol))
+
+
 def print_event(cpu, data, size):
     event = b["events"].event(data)
     printb(b"%-9s " % datetime.now().strftime("%H:%M:%S").encode('ascii'), nl="")
@@ -77,11 +85,8 @@ def print_event(cpu, data, size):
         event.port
     ))
 
-    kernel_stack = stack_traces.walk(event.kernel_stack_id)
-    for (i, addr) in enumerate(kernel_stack):
-        symbol = b.ksym(addr, show_offset=True).decode('utf-8', 'replace')
-        print("  {}: [0x{:x}] {}".format(i, addr, symbol))
-
+    print_stack_traces(stack_traces.walk(event.kernel_stack_id))
+    print_stack_traces(stack_traces.walk(event.user_stack_id))
     print("================")
 
 
