@@ -88,10 +88,12 @@ static void record(struct pt_regs *ctx, struct sock *sk, u8 delayed) {
 
 int kprobe__tcp_send_ack(struct pt_regs *ctx, struct sock *sk) {
     record(ctx, sk, 0);
+    return 0;
 }
 
 int kprobe__tcp_send_delayed_ack(struct pt_regs *ctx, struct sock *sk) {
     record(ctx, sk, 1);
+    return 0;
 }
 """
 
