@@ -115,7 +115,9 @@ static void record(struct pt_regs *ctx, u8 delayed) {
 
     bpf_probe_read(&event.quick, sizeof(u8), &icsk->icsk_ack.quick);
     bpf_probe_read(&event.pingpong, sizeof(u8), &icsk->icsk_ack.pingpong);
-    bpf_probe_read(&event.curr_timeout, sizeof(unsigned long), &icsk->icsk_ack.timeout);
+    unsigned long timeout = 0;
+    bpf_probe_read(&timeout, sizeof(timeout), &icsk->icsk_ack.timeout);
+    event.curr_timeout = timeout - bpf_jiffies64();
     bpf_probe_read(&event.ato, sizeof(u32), &icsk->icsk_ack.ato);
     events.perf_submit(ctx, &event, sizeof(event));
 
