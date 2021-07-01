@@ -1,9 +1,9 @@
 #!/usr/bin/python
 #
-# tcp_ack Trace TCP ack.
+# tcp_delack Trace TCP delayed ack.
 #        For Linux, uses BCC, eBPF. Embedded C.
 #
-# USAGE: tcp_ack -h <HOST>
+# USAGE: tcp_delack -h <HOST>
 from __future__ import print_function
 from bcc import BPF
 from bcc.utils import printb
@@ -15,12 +15,12 @@ import socket
 
 # arguments
 examples = """examples:
-    ./tcp_ack.py -h foo-bar.com
+    ./tcp_delack.py -h foo-bar.com
 """
 
 
 parser = argparse.ArgumentParser(
-    description="Trace TCP ack",
+    description="Trace TCP delayed ack",
     add_help=False)
 parser.add_argument(
     "-h", "--host",
@@ -37,30 +37,61 @@ bpf_text = tcp_headers
 bpf_text += """
 struct event_t {
     u16 port;
+    u8 delayed;
     int kernel_stack_id;
     int user_stack_id;
 };
 
+struct check_ctx_t {
+    int ofo_possible;
+}
+
+BPF_HASH(curr_check_ctx, u64, struct check_ctx_t);
 BPF_STACK_TRACE(stack_traces, 1000);
 BPF_PERF_OUTPUT(events);
 """
 
 bpf_text += """
-int kprobe__tcp_cleanup_rbuf(struct pt_regs *ctx, struct sock *sk, int copied) {
-    u32 daddr = 0; u16 dport = 0;
+int kprobe____tcp_ack_snd_check(struct pt_regs *ctx,
+    struct sock *sk, int ofo_possible) {
+    u32 daddr = 0;
     bpf_probe_read(&daddr, sizeof(daddr), &sk->__sk_common.skc_daddr);
-    bpf_probe_read(&dport, sizeof(dport), &sk->__sk_common.skc_dport);
     if (daddr != TARGET_HOST) {
         return 0;
     }
 
+    struct check_ctx_t check_ctx = {};
+    check_ctx.ofo_possible = ofo_possible;
+    u64 pid_tgid = bpf_get_current_pid_tgid();
+    curr_check_ctx.update(&pid_tgid, &check_ctx);
+
+    return 0;
+}
+
+static void record(struct pt_regs *ctx, struct sock *sk, u8 delayed) {
+    u64 pid_tgid = bpf_get_current_pid_tgid();
+    struct check_ctx_t *check_ctx = curr_check_ctx.lookup(&pid_tgid);
+    if (check_ctx == 0) {
+        return;
+    }
     struct event_t event = {};
+    u16 dport = 0;
+    bpf_probe_read(&dport, sizeof(dport), &sk->__sk_common.skc_dport);
     event.port = ntohs(dport);
+    event.delayed = delayed;
     event.kernel_stack_id = stack_traces.get_stackid(ctx, 0);
     event.user_stack_id = stack_traces.get_stackid(ctx, BPF_F_USER_STACK);
     events.perf_submit(ctx, &event, sizeof(event));
 
-    return 0;
+    curr_check_ctx.delete(&pid_tgid);
+}
+
+int kprobe__tcp_send_ack(struct pt_regs *ctx, struct sock *sk) {
+    record(ctx, sk, 0);
+}
+
+int kprobe__tcp_send_delayed_ack(struct pt_regs *ctx, struct sock *sk) {
+    record(ctx, sk, 1);
 }
 """
 
@@ -81,23 +112,24 @@ def print_stack_traces(frames):
 def print_event(cpu, data, size):
     event = b["events"].event(data)
     printb(b"%-9s " % datetime.now().strftime("%H:%M:%S").encode('ascii'), nl="")
-    printb(b"%-7s" % (
-        event.port
+    printb(b"%-7s %-7s" % (
+        event.port,
+        event.delayed
     ))
 
-    kernel_stack = [] if event.kernel_stack_id < 0 else stack_traces.walk(event.kernel_stack_id)
-    user_stack = [] if event.user_stack_id < 0 else stack_traces.walk(event.user_stack_id)
-    print("kernel stack:")
-    print_stack_traces(kernel_stack)
-    print("user stack:")
-    print_stack_traces(user_stack)
+    # kernel_stack = [] if event.kernel_stack_id < 0 else stack_traces.walk(event.kernel_stack_id)
+    # user_stack = [] if event.user_stack_id < 0 else stack_traces.walk(event.user_stack_id)
+    # print("kernel stack:")
+    # print_stack_traces(kernel_stack)
+    # print("user stack:")
+    # print_stack_traces(user_stack)
 
-    print("================")
+    # print("================")
 
 
 # header
-print("%-9s %-7s" % (
-    "TIME", "DPORT"
+print("%-9s %-7s %-7s" % (
+    "TIME", "DPORT", "DEL"
 ))
 
 
