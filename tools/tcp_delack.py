@@ -114,19 +114,19 @@ def print_stack_traces(frames):
 def print_event(cpu, data, size):
     event = b["events"].event(data)
     printb(b"%-9s " % datetime.now().strftime("%H:%M:%S").encode('ascii'), nl="")
-    printb(b"%-7s %-7s" % (
+    printb(b"%-7d %-7d" % (
         event.port,
         event.delayed
     ))
 
-    # kernel_stack = [] if event.kernel_stack_id < 0 else stack_traces.walk(event.kernel_stack_id)
-    # user_stack = [] if event.user_stack_id < 0 else stack_traces.walk(event.user_stack_id)
-    # print("kernel stack:")
-    # print_stack_traces(kernel_stack)
-    # print("user stack:")
-    # print_stack_traces(user_stack)
+    kernel_stack = [] if event.kernel_stack_id < 0 else stack_traces.walk(event.kernel_stack_id)
+    user_stack = [] if event.user_stack_id < 0 else stack_traces.walk(event.user_stack_id)
+    print("kernel stack:")
+    print_stack_traces(kernel_stack)
+    print("user stack:")
+    print_stack_traces(user_stack)
 
-    # print("================")
+    print("================")
 
 
 # header
