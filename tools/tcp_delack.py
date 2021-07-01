@@ -45,6 +45,7 @@ struct event_t {
     u16 rcv_mss;
     u32 rcv_wnd;
     u32 selected_window;
+    u8 quick_ack;
 };
 
 struct check_ctx_t {
@@ -104,6 +105,11 @@ static void record(struct pt_regs *ctx, struct sock *sk, u8 delayed) {
     bpf_probe_read(&event.rcv_mss, sizeof(u16), &icsk->icsk_ack.rcv_mss);
     bpf_probe_read(&event.rcv_wnd, sizeof(u32), &tp->rcv_wnd);
     event.selected_window = check_ctx->selected_window;
+
+    u8 quick = 0; u8 pingpong = 0;
+    bpf_probe_read(&quick, sizeof(quick), &icsk->isck_ack.quick);
+    bpf_probe_read(&pingpong, sizeof(pingpong), &icsk->isck_ack.pingpong);
+    event.quick = quick && !pingpong;
     events.perf_submit(ctx, &event, sizeof(event));
 
     curr_check_ctx.delete(&pid_tgid);
@@ -137,14 +143,15 @@ def print_stack_traces(frames):
 def print_event(cpu, data, size):
     event = b["events"].event(data)
     printb(b"%-9s " % datetime.now().strftime("%H:%M:%S").encode('ascii'), nl="")
-    printb(b"%-7d %-7d %-10d %-10d %-10d %-10d %-10s" % (
+    printb(b"%-7d %-7d %-10d %-10d %-10d %-10d %-10s %-10s" % (
         event.port,
         event.delayed,
         event.rcv_nxt - event.rcv_wup,
         event.rcv_mss,
         event.selected_window,
         event.rcv_wnd,
-        (((event.rcv_nxt - event.rcv_wup) > event.rcv_mss) and (event.selected_window >= event.rcv_wnd))
+        (((event.rcv_nxt - event.rcv_wup) > event.rcv_mss) and (event.selected_window >= event.rcv_wnd)),
+        event.quick
     ))
 
     # kernel_stack = [] if event.kernel_stack_id < 0 else stack_traces.walk(event.kernel_stack_id)
@@ -158,8 +165,8 @@ def print_event(cpu, data, size):
 
 
 # header
-print("%-9s %-7s %-7s %-10s %-10s %-10s %-10s %-10s" % (
-    "TIME", "DPORT", "DEL", "NXT-WUP", "MSS", "SEL_WND", "RCV_WND", "DEL_BY_FULL"
+print("%-9s %-7s %-7s %-10s %-10s %-10s %-10s %-10s %-10s" % (
+    "TIME", "DPORT", "DEL", "NXT-WUP", "MSS", "SEL_WND", "RCV_WND", "FULL", "QUICK"
 ))
 
 
