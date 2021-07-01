@@ -107,8 +107,8 @@ static void record(struct pt_regs *ctx, struct sock *sk, u8 delayed) {
     event.selected_window = check_ctx->selected_window;
 
     u8 quick = 0; u8 pingpong = 0;
-    bpf_probe_read(&quick, sizeof(quick), &icsk->isck_ack.quick);
-    bpf_probe_read(&pingpong, sizeof(pingpong), &icsk->isck_ack.pingpong);
+    bpf_probe_read(&quick, sizeof(quick), &icsk->icsk_ack.quick);
+    bpf_probe_read(&pingpong, sizeof(pingpong), &icsk->icsk_ack.pingpong);
     event.quick = quick && !pingpong;
     events.perf_submit(ctx, &event, sizeof(event));
 
