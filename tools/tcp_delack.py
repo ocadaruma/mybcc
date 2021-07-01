@@ -44,7 +44,7 @@ struct event_t {
 
 struct check_ctx_t {
     int ofo_possible;
-}
+};
 
 BPF_HASH(curr_check_ctx, u64, struct check_ctx_t);
 BPF_STACK_TRACE(stack_traces, 1000);
