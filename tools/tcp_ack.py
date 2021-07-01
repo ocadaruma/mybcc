@@ -46,7 +46,7 @@ BPF_PERF_OUTPUT(events);
 """
 
 bpf_text += """
-int kprobe____tcp_ack_snd_check(struct pt_regs *ctx, struct sock *sk, int ofo_possible) {
+int kprobe__tcp_cleanup_rbuf(struct pt_regs *ctx, struct sock *sk, int copied) {
     u32 daddr = 0; u16 dport = 0;
     bpf_probe_read(&daddr, sizeof(daddr), &sk->__sk_common.skc_daddr);
     bpf_probe_read(&dport, sizeof(dport), &sk->__sk_common.skc_dport);
