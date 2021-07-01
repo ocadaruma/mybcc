@@ -93,6 +93,7 @@ print("%-9s %-7s" % (
 
 # initialize BPF
 b = BPF(text=bpf_text)
+stack_traces = b.get_table("stack_traces")
 
 # read events
 b["events"].open_perf_buffer(print_event)
