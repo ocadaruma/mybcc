@@ -40,10 +40,16 @@ struct event_t {
     u8 delayed;
     int kernel_stack_id;
     int user_stack_id;
+    u32 rcv_nxt;
+    u32 rcv_wup;
+    u16 rcv_mss;
+    u32 rcv_wnd;
+    u32 selected_window;
 };
 
 struct check_ctx_t {
     int ofo_possible;
+    u32 selected_window;
 };
 
 BPF_HASH(curr_check_ctx, u64, struct check_ctx_t);
@@ -68,6 +74,15 @@ int kprobe____tcp_ack_snd_check(struct pt_regs *ctx,
     return 0;
 }
 
+int kretprobe____tcp_select_window(struct pt_regs *ctx) {
+    u64 pid_tgid = bpf_get_current_pid_tgid();
+    struct check_ctx_t *check_ctx = curr_check_ctx.lookup(&pid_tgid);
+    if (check_ctx != 0) {
+        check_ctx->selected_window = (u32)PT_REGS_RC(ctx);
+    }
+    return 0;
+}
+
 static void record(struct pt_regs *ctx, struct sock *sk, u8 delayed) {
     u64 pid_tgid = bpf_get_current_pid_tgid();
     struct check_ctx_t *check_ctx = curr_check_ctx.lookup(&pid_tgid);
@@ -81,6 +96,14 @@ static void record(struct pt_regs *ctx, struct sock *sk, u8 delayed) {
     event.delayed = delayed;
     event.kernel_stack_id = stack_traces.get_stackid(ctx, 0);
     event.user_stack_id = stack_traces.get_stackid(ctx, BPF_F_USER_STACK);
+
+    struct tcp_sock *tp = (struct tcp_sock *)sk;
+    struct inet_connection_sock *icsk = (struct inet_connection_sock *)sk;
+    bpf_probe_read(&event.rcv_nxt, sizeof(u32), &tp->rcv_nxt);
+    bpf_probe_read(&event.rcv_wup, sizeof(u32), &tp->rcv_wup);
+    bpf_probe_read(&event.rcv_mss, sizeof(u16), &icsk->icsk_ack.rcv_mss);
+    bpf_probe_read(&event.rcv_wnd, sizeof(u32), &tp->rcv_wnd);
+    event.selected_window = check_ctx->selected_window;
     events.perf_submit(ctx, &event, sizeof(event));
 
     curr_check_ctx.delete(&pid_tgid);
@@ -114,24 +137,29 @@ def print_stack_traces(frames):
 def print_event(cpu, data, size):
     event = b["events"].event(data)
     printb(b"%-9s " % datetime.now().strftime("%H:%M:%S").encode('ascii'), nl="")
-    printb(b"%-7d %-7d" % (
+    printb(b"%-7d %-7d %-10d %-10d %-10d %-10d %-10s" % (
         event.port,
-        event.delayed
+        event.delayed,
+        event.rcv_nxt - event.rcv_wup,
+        event.rcv_mss,
+        event.selected_window,
+        event.rcv_wnd,
+        (((event.rcv_nxt - event.rcv_wup) > event.rcv_mss) and (event.selected_window >= event.rcv_wnd))
     ))
 
-    kernel_stack = [] if event.kernel_stack_id < 0 else stack_traces.walk(event.kernel_stack_id)
-    user_stack = [] if event.user_stack_id < 0 else stack_traces.walk(event.user_stack_id)
-    print("kernel stack:")
-    print_stack_traces(kernel_stack)
-    print("user stack:")
-    print_stack_traces(user_stack)
+    # kernel_stack = [] if event.kernel_stack_id < 0 else stack_traces.walk(event.kernel_stack_id)
+    # user_stack = [] if event.user_stack_id < 0 else stack_traces.walk(event.user_stack_id)
+    # print("kernel stack:")
+    # print_stack_traces(kernel_stack)
+    # print("user stack:")
+    # print_stack_traces(user_stack)
 
-    print("================")
+    # print("================")
 
 
 # header
-print("%-9s %-7s %-7s" % (
-    "TIME", "DPORT", "DEL"
+print("%-9s %-7s %-7s %-10s %-10s %-10s %-10s %-10s" % (
+    "TIME", "DPORT", "DEL", "NXT-WUP", "MSS", "SEL_WND", "RCV_WND", "DEL_BY_FULL"
 ))
 
 
