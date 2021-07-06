@@ -2,6 +2,8 @@
 
 == C
 * `x ? : y` is equivalent to `x ? x : y`
+* https://gcc.gnu.org/onlinedocs/gcc/Zero-Length.html[Zero length array] is often used to declare a pointer to variable length object, as a last member of a struct.
+** e.g. listen_sock's syn_table member in `include/net/request_sock.h`
 
 == TIPS
 * To check if a function can be attached by kprobe
