@@ -22,8 +22,7 @@ parser = argparse.ArgumentParser(
 parser.add_argument(
     "struct_name",
     metavar="STRUCT_NAME",
-    help="Target struct name",
-    required=True)
+    help="Target struct name")
 args = parser.parse_args()
 
 # define BPF program
